@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>DigiTax_demo.Blazor</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
