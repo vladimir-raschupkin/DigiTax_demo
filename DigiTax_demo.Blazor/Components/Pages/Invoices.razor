@@ -1,0 +1,71 @@
+@page "/invoices"
+@using DigiTax.Api
+@inject DigiTaxOpenApiClient DigiTaxClient
+
+<PageTitle>Invoices</PageTitle>
+
+<h1>Invoices</h1>
+
+@if (_isLoading)
+{
+    <p>Loading invoices...</p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_invoices.Count == 0)
+{
+    <p>No invoices were found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Invoice number</th>
+                    <th>ID</th>
+                    <th>Issue date</th>
+                    <th>Sum</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var invoice in _invoices)
+                {
+                    <tr>
+                        <td>@(invoice.Trader_invoice_number ?? invoice.Invoice_number ?? "Not provided")</td>
+                        <td>@invoice.Id</td>
+                        <td>@invoice.Issue_date.ToString("yyyy-MM-dd")</td>
+                        <td>@($"{invoice.Line_extension_amount.ToString("N2")} {invoice.Document_currency_code}")</td>
+                        <td>@invoice.Overall_status.ToString()</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private readonly List<Invoice> _invoices = [];
+    private string? _errorMessage;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await DigiTaxClient.InvoicesGETAsync(null, null, 20);
+            _invoices.AddRange(response.Data);
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Invoices could not be loaded: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
