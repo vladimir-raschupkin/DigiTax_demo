@@ -10,4 +10,6 @@ var webfrontend = builder.AddViteApp("webfrontend", "../frontend")
 
 server.PublishWithContainerFiles(webfrontend, "wwwroot");
 
+builder.AddProject<Projects.DigiTax_demo_Blazor>("digitax-demo-blazor");
+
 builder.Build().Run();
