@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DigiTax_demo.Blazor\DigiTax_demo.Blazor.csproj" />
     <ProjectReference Include="..\DigiTax_demo.Server\DigiTax_demo.Server.csproj" />
   </ItemGroup>
 
