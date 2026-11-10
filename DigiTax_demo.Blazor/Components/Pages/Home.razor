@@ -1,7 +1,60 @@
 ﻿@page "/"
+@using DigiTax.Api
+@inject DigiTaxOpenApiClient DigiTaxClient
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Business information</h1>
 
-Welcome to your new app.
+@if (_isLoading)
+{
+    <p>Loading business information...</p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_business is not null)
+{
+    <dl>
+        <dt>Business Name</dt>
+        <dd>@_business.Legal_entity.Registration_name</dd>
+
+        <dt>Business ID</dt>
+        <dd>@_business.Business_id</dd>
+
+        <dt>Tax identification number</dt>
+        <dd>@_business.Tax_identification_number</dd>
+
+        <dt>Tax registration number</dt>
+        <dd>@(_business.Tax_registration_number ?? "Not provided")</dd>
+
+        <dt>Environment</dt>
+        <dd>@(_business.Is_test ? "Test" : "Not test")</dd>
+
+        <dt>Status</dt>
+        <dd>@(_business.Active ? "Active" : "Inactive")</dd>
+    </dl>
+}
+
+@code {
+    private Branch? _business;
+    private string? _errorMessage;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _business = await DigiTaxClient.InfoAsync();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Business information could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
