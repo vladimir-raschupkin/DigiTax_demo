@@ -17,6 +17,9 @@ else if (_errorMessage is not null)
 else if (_business is not null)
 {
     <dl>
+        <dt>Business Name</dt>
+        <dd>@_business.Legal_entity.Registration_name</dd>
+
         <dt>Business ID</dt>
         <dd>@_business.Business_id</dd>
 
@@ -25,6 +28,9 @@ else if (_business is not null)
 
         <dt>Tax registration number</dt>
         <dd>@(_business.Tax_registration_number ?? "Not provided")</dd>
+
+        <dt>Environment</dt>
+        <dd>@(_business.Is_test ? "Test" : "Not test")</dd>
 
         <dt>Status</dt>
         <dd>@(_business.Active ? "Active" : "Inactive")</dd>
