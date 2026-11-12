@@ -1,0 +1,172 @@
+@page "/invoices/{Id}"
+@using DigiTax.Api
+@using DigiTaxInvoice = DigiTax.Api.Invoice
+@using Microsoft.AspNetCore.Components
+@inject DigiTaxOpenApiClient DigiTaxClient
+
+<PageTitle>Invoice details</PageTitle>
+
+<p>
+    <a href="/invoices">&lt;&lt; Invoices</a>
+</p>
+
+@if (_isLoading)
+{
+    <p>Loading invoice...</p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_invoice is not null)
+{
+    <div class="mb-3">
+        <h1>Invoice @InvoiceNumber</h1>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <h2 class="h5">Invoice information</h2>
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <small class="text-muted d-block">Issue date</small>
+                    <div>@_invoice.Issue_date.ToString("yyyy-MM-dd")</div>
+                </div>
+                <div class="col-sm-6">
+                    <small class="text-muted d-block">Due date</small>
+                    <div>@_invoice.Due_date.ToString("yyyy-MM-dd")</div>
+                </div>
+                <div class="col-sm-6">
+                    <small class="text-muted d-block">Sum</small>
+                    <div>@FormatAmount(_invoice.Payable_amount)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <h2 class="h5">Issued to</h2>
+            @if (_customer is not null)
+            {
+                <address>
+                    <strong>@CustomerName</strong><br />
+                    @if (_customer.Address is not null)
+                    {
+                        @if (!string.IsNullOrWhiteSpace(_customer.Address.Street_name))
+                        {
+                            @(_customer.Address.Street_name)<br />
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_customer.Address.Additional_street_name))
+                        {
+                            @(_customer.Address.Additional_street_name)<br />
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_customer.Address.Address_line))
+                        {
+                            @(_customer.Address.Address_line)<br />
+                        }
+                        @(_customer.Address.Postal_zone) @(_customer.Address.City_name)<br />
+                        @($"{_customer.Address.Country_subentity}, {_customer.Address.Country_code}")
+                    }
+                </address>
+            }
+            else
+            {
+                <p>Customer information is not available.</p>
+            }
+        </div>
+    </div>
+
+    <h2 class="h5">Items</h2>
+    @if (_invoice.Items is null || _invoice.Items.Count == 0)
+    {
+        <p>No items were found for this invoice.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th>Amount unit</th>
+                        <th>Price</th>
+                        <th>Sum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var invoiceItem in _invoice.Items)
+                    {
+                        <tr>
+                            <td>@GetItemName(invoiceItem.Item_id)</td>
+                            <td>@invoiceItem.Quantity.ToString("N2")</td>
+                            <td>@invoiceItem.Unit_of_measure_code</td>
+                            <td>@FormatAmount(invoiceItem.Price_amount)</td>
+                            <td>@FormatAmount(invoiceItem.Line_extension_amount)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private DigiTaxInvoice? _invoice;
+    private Party? _customer;
+    private readonly Dictionary<string, Item> _items = [];
+    private string? _errorMessage;
+    private bool _isLoading = true;
+
+    private string? InvoiceNumber => _invoice?.Trader_invoice_number ?? _invoice?.Invoice_number;
+
+    private string CustomerName => _customer?.Party_name
+        ?? _customer?.Legal_entity?.Registration_name
+        ?? "Not provided";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _invoice = null;
+        _customer = null;
+        _items.Clear();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Id))
+            {
+                throw new ArgumentException("The invoice ID is missing.", nameof(Id));
+            }
+
+            _invoice = await DigiTaxClient.InvoicesGET2Async(Id);
+
+            var customerTask = DigiTaxClient.PartiesGET2Async(_invoice.Customer_party_id);
+            var itemTasks = (_invoice.Items ?? []).Select(invoiceItem =>
+                DigiTaxClient.ItemsGET2Async(invoiceItem.Item_id));
+
+            _customer = await customerTask;
+            var itemResults = await Task.WhenAll(itemTasks);
+            foreach (var item in itemResults)
+            {
+                _items[item.Id] = item;
+            }
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Invoice could not be loaded: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetItemName(string itemId) =>
+        _items.TryGetValue(itemId, out var item) ? item.Name : "Not provided";
+
+    private string FormatAmount(double amount) =>
+        $"{amount.ToString("N2")} {_invoice?.Document_currency_code}";
+}
