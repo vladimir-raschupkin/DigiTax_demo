@@ -198,7 +198,7 @@ else if (_invoice is not null)
         {
             var request = new Body6
             {
-                Trader_invoice_number = "", //_invoice.Trader_invoice_number ?? _invoice.Invoice_number!,
+                Trader_invoice_number = $"INV-CN-{DateTime.UtcNow:yyyyMMddHHmmss}",// "", //_invoice.Trader_invoice_number ?? _invoice.Invoice_number!,
                 Credit_note_reason_code = _selectedReasonCode,
                 Credit_note_reason = _reason,
                 Original_invoice_id = _invoice.Id,
