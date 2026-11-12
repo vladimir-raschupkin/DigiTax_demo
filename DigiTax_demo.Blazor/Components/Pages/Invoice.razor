@@ -21,7 +21,10 @@ else if (_errorMessage is not null)
 else if (_invoice is not null)
 {
     <div class="mb-3">
-        <h1>Invoice @InvoiceNumber</h1>
+        <div class="d-flex justify-content-between align-items-center gap-2">
+            <h1>Invoice @InvoiceNumber</h1>
+            <a class="btn btn-primary" href="@($"/invoices/{_invoice.Id}/credit-note")">Create credit note</a>
+        </div>
     </div>
 
     <div class="row g-4 mb-4">

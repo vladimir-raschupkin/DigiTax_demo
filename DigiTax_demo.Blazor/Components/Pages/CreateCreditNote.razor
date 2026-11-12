@@ -1,0 +1,240 @@
+@page "/invoices/{Id}/credit-note"
+@using DigiTax.Api
+@using DigiTaxInvoice = DigiTax.Api.Invoice
+@inject DigiTaxOpenApiClient DigiTaxClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create credit note</PageTitle>
+
+<h1>Create credit note</h1>
+
+@if (_isLoading)
+{
+    <p>Loading invoice...</p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_invoice is not null)
+{
+    <div class="mb-3">
+        <label for="credit-note-reason-code" class="form-label">Credit note reason code</label>
+        <select id="credit-note-reason-code" class="form-select" @bind="_selectedReasonCode" disabled="@_isLoadingReasons">
+            <option value="">Select a credit note reason</option>
+            @foreach (var reason in _creditReasons)
+            {
+                <option value="@reason.Code">@reason.Code - @reason.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="credit-note-reason" class="form-label">Credit note reason</label>
+        <input id="credit-note-reason" class="form-control" @bind="_reason" maxlength="255" />
+    </div>
+
+    <div class="mb-3">
+        <label for="invoice-item" class="form-label">Invoice item</label>
+        <select id="invoice-item" class="form-select" value="@_selectedItemId" @onchange="AddItem" disabled="@_isLoadingItems">
+            <option value="">Select an item to add</option>
+            @foreach (var item in _items)
+            {
+                <option value="@item.Id">@item.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <h2 class="h5">Credit note items</h2>
+        <div class="row">
+            <div class="col">
+                <label class="form-label">Item</label>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Sum</label>
+            </div>
+        </div>
+        @foreach (var invoiceItem in _invoiceItems)
+        {
+            <div class="row align-items-end mb-2" @key="invoiceItem">
+                <div class="col">
+                    <input class="form-control" value="@invoiceItem.Item.Name" readonly />
+                </div>
+                <div class="col-md-4">
+                    <input type="number" min="0" step="0.01" class="form-control" @bind="invoiceItem.Sum" />
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-secondary" href="@($"/invoices/{_invoice.Id}")">Cancel</a>
+        <button type="button" class="btn btn-primary" @onclick="HandleCreateCreditNote" disabled="@_isCreating">
+            @(_isCreating ? "Creating..." : "Create")
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private DigiTaxInvoice? _invoice;
+    private readonly List<CommonCode> _creditReasons = [];
+    private readonly List<Item> _items = [];
+    private readonly List<SelectedInvoiceItem> _invoiceItems = [];
+    private readonly Dictionary<string, Item> _itemsById = [];
+    private string? _selectedReasonCode;
+    private string? _reason;
+    private string? _selectedItemId;
+    private string? _errorMessage;
+    private bool _isLoading = true;
+    private bool _isLoadingReasons = true;
+    private bool _isLoadingItems = true;
+    private bool _isCreating;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _isLoadingReasons = true;
+        _isLoadingItems = true;
+        _errorMessage = null;
+        _invoice = null;
+        _creditReasons.Clear();
+        _items.Clear();
+        _itemsById.Clear();
+        _invoiceItems.Clear();
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Id))
+            {
+                throw new ArgumentException("The invoice ID is missing.", nameof(Id));
+            }
+
+            var invoiceTask = DigiTaxClient.InvoicesGET2Async(Id);
+            var reasonsTask = DigiTaxClient.CreditReasonsAsync();
+            var itemsTask = DigiTaxClient.ItemsGETAsync(null, null, null);
+
+            _invoice = await invoiceTask;
+            _creditReasons.AddRange(await reasonsTask);
+            var itemsResponse = await itemsTask;
+            _items.AddRange(itemsResponse.Data);
+
+            foreach (var item in _items)
+            {
+                _itemsById[item.Id] = item;
+            }
+
+            foreach (var invoiceItem in _invoice.Items ?? [])
+            {
+                if (_itemsById.TryGetValue(invoiceItem.Item_id, out var item))
+                {
+                    _invoiceItems.Add(new SelectedInvoiceItem(item, (decimal)invoiceItem.Line_extension_amount));
+                }
+            }
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Credit note data could not be loaded: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            _isLoadingReasons = false;
+            _isLoadingItems = false;
+        }
+    }
+
+    private void AddItem(ChangeEventArgs args)
+    {
+        _selectedItemId = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(_selectedItemId))
+        {
+            return;
+        }
+
+        if (_itemsById.TryGetValue(_selectedItemId, out var item))
+        {
+            _invoiceItems.Add(new SelectedInvoiceItem(item));
+        }
+
+        _selectedItemId = string.Empty;
+    }
+
+    private async Task HandleCreateCreditNote()
+    {
+        _errorMessage = null;
+
+        if (_invoice is null)
+        {
+            _errorMessage = "The source invoice could not be loaded.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedReasonCode))
+        {
+            _errorMessage = "Please select a credit note reason code.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _errorMessage = "Please enter a credit note reason.";
+            return;
+        }
+
+        if (_invoiceItems.Count == 0 || _invoiceItems.Any(invoiceItem => !invoiceItem.Sum.HasValue || invoiceItem.Sum <= 0))
+        {
+            _errorMessage = "Add at least one invoice item and enter a positive sum for each item.";
+            return;
+        }
+
+        _isCreating = true;
+
+        try
+        {
+            var request = new Body6
+            {
+                Trader_invoice_number = "", //_invoice.Trader_invoice_number ?? _invoice.Invoice_number!,
+                Credit_note_reason_code = _selectedReasonCode,
+                Credit_note_reason = _reason,
+                Original_invoice_id = _invoice.Id,
+                Invoice_type_code = "381",
+                Issue_date = DateTimeOffset.UtcNow.Date,
+                Due_date = _invoice.Due_date,
+                Document_currency_code = _invoice.Document_currency_code,
+                Customer_party_id = _invoice.Customer_party_id,
+                Items = _invoiceItems.Select(invoiceItem => new CreateInvoiceItemRequest
+                {
+                    Item_id = invoiceItem.Item.Id,
+                    Quantity = 1,
+                    Unit_of_measure_code = "C62",
+                    Price_amount = (double)invoiceItem.Sum!.Value,
+                    Tax_category_code = invoiceItem.Item.Tax_category_code,
+                    Tax_rate = 0
+                }).ToList()
+            };
+
+            var creditNote = await DigiTaxClient.CreditNotesPOSTAsync(request);
+            NavigationManager.NavigateTo($"/invoices/{_invoice.Id}");
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Credit note could not be created: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private sealed class SelectedInvoiceItem(Item item, decimal? sum = null)
+    {
+        public Item Item { get; } = item;
+
+        public decimal? Sum { get; set; } = sum;
+    }
+}
