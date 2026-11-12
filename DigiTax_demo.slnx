@@ -1,9 +1,3 @@
 <Solution>
-  <Project Path="DigiTax_demo.AppHost/DigiTax_demo.AppHost.csproj" />
   <Project Path="DigiTax_demo.Blazor/DigiTax_demo.Blazor.csproj" />
-  <Project Path="DigiTax_demo.Server/DigiTax_demo.Server.csproj" />
-  <Project Path="frontend/frontend.esproj">
-    <Build />
-    <Deploy />
-  </Project>
 </Solution>
