@@ -186,7 +186,7 @@
         {
             var request = new Body5
             {
-                Trader_invoice_number = $"INV-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                Trader_invoice_number = "", // $"INV-{DateTime.UtcNow:yyyyMMddHHmmss}",
                 Invoice_type_code = _selectedInvoiceTypeCode,
                 Issue_date = DateTimeOffset.UtcNow.Date,
                 Due_date = new DateTimeOffset(_dueDate.Value),

@@ -1,5 +1,6 @@
 @page "/invoices"
 @using DigiTax.Api
+@using DigiTaxInvoice = DigiTax.Api.Invoice
 @inject DigiTaxOpenApiClient DigiTaxClient
 
 <PageTitle>Invoices</PageTitle>
@@ -39,7 +40,11 @@ else
                 @foreach (var invoice in _invoices)
                 {
                     <tr>
-                        <td>@(invoice.Trader_invoice_number ?? invoice.Invoice_number ?? "Not provided")</td>
+                        <td>
+                            <a href="@($"/invoices/{invoice.Id}")">
+                                @(invoice.Trader_invoice_number ?? invoice.Invoice_number ?? "Not provided")
+                            </a>
+                        </td>
                         <td>@invoice.Id</td>
                         <td>@invoice.Issue_date.ToString("yyyy-MM-dd")</td>
                         <td>@($"{invoice.Line_extension_amount.ToString("N2")} {invoice.Document_currency_code}")</td>
@@ -52,7 +57,7 @@ else
 }
 
 @code {
-    private readonly List<Invoice> _invoices = [];
+    private readonly List<DigiTaxInvoice> _invoices = [];
     private string? _errorMessage;
     private bool _isLoading = true;
 
