@@ -1,0 +1,232 @@
+@page "/invoices/create"
+@using DigiTax.Api
+@inject DigiTaxOpenApiClient DigiTaxClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create invoice</PageTitle>
+
+<h1>Create invoice</h1>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+<div class="mb-3">
+    <label for="due-date" class="form-label">Due date</label>
+    <input id="due-date" type="date" class="form-control" min="@MinimumDueDate" max="@MaximumDueDate" @bind="_dueDate" />
+</div>
+
+<div class="mb-3">
+    <label for="invoice-type" class="form-label">Invoice type</label>
+    <select id="invoice-type" class="form-select" @bind="_selectedInvoiceTypeCode" disabled="@_isLoadingTypes">
+        <option value="">Select an invoice type</option>
+        @foreach (var invoiceType in _invoiceTypes)
+        {
+            <option value="@invoiceType.Code">@invoiceType.Code - @invoiceType.Name</option>
+        }
+    </select>
+</div>
+
+@* <div class="mb-3">
+    <label for="payment-method" class="form-label">Payment method</label>
+    <select id="payment-method" class="form-select" @bind="_paymentMeansCode">
+        <option value="48">Credit Card</option>
+    </select>
+</div> *@
+
+<div class="mb-3">
+    <label for="customer" class="form-label">Customer</label>
+    <select id="customer" class="form-select" @bind="_selectedCustomerId" disabled="@_isLoadingCustomers">
+        <option value="">Select a customer</option>
+        @foreach (var customer in _customers)
+        {
+            <option value="@customer.Id">@(customer.Party_name ?? customer.Legal_entity.Registration_name)</option>
+        }
+    </select>
+</div>
+
+<div class="mb-3">
+    <label for="invoice-item" class="form-label">Invoice item</label>
+    <select id="invoice-item" class="form-select" value="@_selectedItemId" @onchange="AddItem" disabled="@_isLoadingItems">
+        <option value="">Select an item to add</option>
+        @foreach (var item in _items)
+        {
+            <option value="@item.Id">@item.Name</option>
+        }
+    </select>
+</div>
+
+<div class="mb-3">
+    <h2 class="h5">Invoice items</h2>
+    <div class="row">
+        <div class="col">
+            <label class="form-label">Item</label>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Sum</label>
+        </div>
+    </div>
+    @foreach (var invoiceItem in _invoiceItems)
+    {
+        <div class="row align-items-end mb-2" @key="invoiceItem">
+            <div class="col">
+                <input class="form-control" value="@invoiceItem.Item.Name" readonly />
+            </div>
+            <div class="col-md-4">
+                <input type="number" min="0" step="0.01" class="form-control" @bind="invoiceItem.Sum" />
+            </div>
+        </div>
+    }
+</div>
+
+<div class="d-flex gap-2">
+    <a class="btn btn-secondary" href="/invoices">Cancel</a>
+    <button type="button" class="btn btn-primary" @onclick="HandleCreateInvoice" disabled="@_isCreating">
+        @(_isCreating ? "Creating..." : "Create")
+    </button>
+</div>
+
+@code {
+    private static string MinimumDueDate => DateTime.Today.ToString("yyyy-MM-dd");
+    private static string MaximumDueDate => DateTime.Today.AddMonths(1).ToString("yyyy-MM-dd");
+
+    private DateTime? _dueDate;
+    private readonly List<InvoiceType> _invoiceTypes = [];
+    private readonly List<Party> _customers = [];
+    private readonly List<Item> _items = [];
+    private readonly List<SelectedInvoiceItem> _invoiceItems = [];
+    private string? _selectedInvoiceTypeCode;
+    private string? _selectedCustomerId;
+    private string? _selectedItemId;
+    private string _paymentMeansCode = "54";
+    private string? _errorMessage;
+    private bool _isLoadingTypes = true;
+    private bool _isLoadingCustomers = true;
+    private bool _isLoadingItems = true;
+    private bool _isCreating;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var invoiceTypes = await DigiTaxClient.InvoiceTypesAsync();
+            _invoiceTypes.AddRange(invoiceTypes);
+            _selectedInvoiceTypeCode = _invoiceTypes
+                .FirstOrDefault(invoiceType => invoiceType.Code == "380")?.Code;
+
+            var customersResponse = await DigiTaxClient.PartiesGETAsync(null, null, null);
+            _customers.AddRange(customersResponse.Data);
+
+            var itemsResponse = await DigiTaxClient.ItemsGETAsync(null, null, null);
+            var itemResponse = await DigiTaxClient.ItemsGET2Async(itemsResponse.Data.First().Id);
+            _items.AddRange(itemsResponse.Data);
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Error: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isLoadingTypes = false;
+            _isLoadingCustomers = false;
+            _isLoadingItems = false;
+        }
+    }
+
+    private void AddItem(ChangeEventArgs args)
+    {
+        _selectedItemId = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(_selectedItemId))
+        {
+            return;
+        }
+
+        var item = _items.FirstOrDefault(item => item.Id == _selectedItemId);
+        if (item is not null)
+        {
+            _invoiceItems.Add(new SelectedInvoiceItem(item));
+        }
+
+        _selectedItemId = string.Empty;
+    }
+
+    private async Task HandleCreateInvoice()
+    {
+        _errorMessage = null;
+
+        if (!_dueDate.HasValue)
+        {
+            _errorMessage = "Please select a due date.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedInvoiceTypeCode))
+        {
+            _errorMessage = "Please select an invoice type.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedCustomerId))
+        {
+            _errorMessage = "Please select a customer.";
+            return;
+        }
+
+        if (_invoiceItems.Count == 0 || _invoiceItems.Any(invoiceItem => !invoiceItem.Sum.HasValue || invoiceItem.Sum <= 0))
+        {
+            _errorMessage = "Add at least one invoice item and enter a positive sum for each item.";
+            return;
+        }
+
+        _isCreating = true;
+
+        try
+        {
+            var request = new Body5
+            {
+                Trader_invoice_number = $"INV-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                Invoice_type_code = _selectedInvoiceTypeCode,
+                Issue_date = DateTimeOffset.UtcNow.Date,
+                Due_date = new DateTimeOffset(_dueDate.Value),
+                Document_currency_code = "AED",
+                Customer_party_id = _selectedCustomerId,
+                Payments =
+                [
+                    new CreateInvoicePaymentRequest
+                    {
+                        Payment_means_code = _paymentMeansCode
+                    }
+                ],
+                Items = _invoiceItems.Select(invoiceItem => new CreateInvoiceItemRequest
+                {
+                    Item_id = invoiceItem.Item.Id,
+                    Quantity = 1,
+                    Unit_of_measure_code = "C62",
+                    Price_amount = (double)invoiceItem.Sum!.Value,
+                    Tax_category_code = invoiceItem.Item.Tax_category_code,
+                    Tax_rate = 0
+                }).ToList()
+            };
+
+            var invoice = await DigiTaxClient.InvoicesPOSTAsync(request);
+            NavigationManager.NavigateTo("/invoices");
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Invoice could not be created: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private sealed class SelectedInvoiceItem(Item item)
+    {
+        public Item Item { get; } = item;
+
+        public decimal? Sum { get; set; }
+    }
+}
