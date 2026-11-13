@@ -3,6 +3,16 @@
 @inject DigiTaxOpenApiClient DigiTaxClient
 @inject NavigationManager NavigationManager
 
+<style>
+    .create-invoice-field {
+        max-width: 50ch;
+    }
+
+    .invoice-item-sum {
+        width: 15ch;
+    }
+</style>
+
 <PageTitle>Create invoice</PageTitle>
 
 <h1>Create invoice</h1>
@@ -14,12 +24,12 @@
 
 <div class="mb-3">
     <label for="due-date" class="form-label">Due date</label>
-    <input id="due-date" type="date" class="form-control" min="@MinimumDueDate" max="@MaximumDueDate" @bind="_dueDate" />
+    <input id="due-date" type="date" class="form-control create-invoice-field" min="@MinimumDueDate" max="@MaximumDueDate" @bind="_dueDate" />
 </div>
 
 <div class="mb-3">
     <label for="invoice-type" class="form-label">Invoice type</label>
-    <select id="invoice-type" class="form-select" @bind="_selectedInvoiceTypeCode" disabled="@_isLoadingTypes">
+    <select id="invoice-type" class="form-select create-invoice-field" @bind="_selectedInvoiceTypeCode" disabled="@_isLoadingTypes">
         <option value="">Select an invoice type</option>
         @foreach (var invoiceType in _invoiceTypes)
         {
@@ -37,7 +47,7 @@
 
 <div class="mb-3">
     <label for="customer" class="form-label">Customer</label>
-    <select id="customer" class="form-select" @bind="_selectedCustomerId" disabled="@_isLoadingCustomers">
+    <select id="customer" class="form-select create-invoice-field" @bind="_selectedCustomerId" disabled="@_isLoadingCustomers">
         <option value="">Select a customer</option>
         @foreach (var customer in _customers)
         {
@@ -48,7 +58,7 @@
 
 <div class="mb-3">
     <label for="invoice-item" class="form-label">Invoice item</label>
-    <select id="invoice-item" class="form-select" value="@_selectedItemId" @onchange="AddItem" disabled="@_isLoadingItems">
+    <select id="invoice-item" class="form-select create-invoice-field" value="@_selectedItemId" @onchange="AddItem" disabled="@_isLoadingItems">
         <option value="">Select an item to add</option>
         @foreach (var item in _items)
         {
@@ -59,22 +69,22 @@
 
 <div class="mb-3">
     <h2 class="h5">Invoice items</h2>
-    <div class="row">
+    <div class="row g-2 align-items-end create-invoice-field">
         <div class="col">
             <label class="form-label">Item</label>
         </div>
-        <div class="col-md-4">
+        <div class="col-auto">
             <label class="form-label">Sum</label>
         </div>
     </div>
     @foreach (var invoiceItem in _invoiceItems)
     {
-        <div class="row align-items-end mb-2" @key="invoiceItem">
+        <div class="row g-2 align-items-end flex-nowrap mb-2 create-invoice-field" @key="invoiceItem">
             <div class="col">
                 <input class="form-control" value="@invoiceItem.Item.Name" readonly />
             </div>
-            <div class="col-md-4">
-                <input type="number" min="0" step="0.01" class="form-control" @bind="invoiceItem.Sum" />
+            <div class="col-auto">
+                <input type="number" min="0" step="0.01" class="form-control invoice-item-sum" @bind="invoiceItem.Sum" />
             </div>
         </div>
     }
