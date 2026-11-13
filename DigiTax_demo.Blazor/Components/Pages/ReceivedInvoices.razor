@@ -1,0 +1,79 @@
+@page "/received-invoices"
+@using DigiTax.Api
+@using DigiTaxReceivedInvoice = DigiTax.Api.ReceivedInvoice
+@inject DigiTaxOpenApiClient DigiTaxClient
+
+<PageTitle>Received invoices</PageTitle>
+
+<h1>Received invoices</h1>
+
+@if (_isLoading)
+{
+    <p>Loading received invoices...</p>
+}
+else if (_errorMessage is not null)
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+else if (_invoices.Count == 0)
+{
+    <p>No received invoices were found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Invoice number</th>
+                    <th>ID</th>
+                    <th>Issue date</th>
+                    <th>Sum</th>
+                    <th>Viewed at</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var invoice in _invoices)
+                {
+                    <tr>
+                        <td>
+                            <a href="@($"/received-invoices/{invoice.Id}")">
+                                @(invoice.Invoice_number ?? "Not provided")
+                            </a>
+                        </td>
+                        <td>@invoice.Id</td>
+                        <td>@(invoice.Issue_date.ToString("yyyy-MM-dd"))</td>
+                        <td>@($"{invoice.Line_extension_amount:N2} {invoice.Document_currency_code}")</td>
+                        <td>@FormatViewedAt(invoice.Acknowledgement.Acknowledged_at)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private readonly List<DigiTaxReceivedInvoice> _invoices = [];
+    private string? _errorMessage;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await DigiTaxClient.ReceivedInvoicesAsync(null, null, 20, null);
+            _invoices.AddRange(response.Data);
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Received invoices could not be loaded: {apiException.Result.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string FormatViewedAt(DateTimeOffset? viewedAt) =>
+        viewedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not viewed";
+}
