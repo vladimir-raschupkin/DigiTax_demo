@@ -21,7 +21,14 @@ else if (_errorMessage is not null)
 else if (_invoice is not null)
 {
     <div class="mb-3">
-        <h1>Received invoice @InvoiceNumber</h1>
+        <div class="d-flex justify-content-between align-items-center gap-2">
+            <h1>Received invoice @InvoiceNumber</h1>
+            <button class="btn btn-primary"
+                    @onclick="AcknowledgeInvoiceAsync"
+                    disabled="@IsAcknowledged">
+                Confirm viewed
+            </button>
+        </div>
     </div>
 
     <div class="row g-4 mb-4">
@@ -120,6 +127,9 @@ else if (_invoice is not null)
 
     private string? InvoiceNumber => _invoice?.Invoice_number;
 
+    private bool IsAcknowledged =>
+        _invoice?.Acknowledgement.Status == ReceivedInvoiceAcknowledgementStatus.ACKNOWLEDGED;
+
     private string SupplierName => _invoice?.Supplier_party?.Party_name
         ?? _invoice?.Supplier_party?.Legal_entity?.Registration_name
         ?? "Not provided";
@@ -146,6 +156,23 @@ else if (_invoice is not null)
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task AcknowledgeInvoiceAsync()
+    {
+        if (_invoice is null || string.IsNullOrWhiteSpace(Id) || IsAcknowledged)
+        {
+            return;
+        }
+
+        try
+        {
+            _invoice = await DigiTaxClient.AcknowledgeAsync(Id);
+        }
+        catch (ApiException<DigiTax.Api.Response> apiException)
+        {
+            _errorMessage = $"Received invoice could not be acknowledged: {apiException.Result.Message}";
         }
     }
 
